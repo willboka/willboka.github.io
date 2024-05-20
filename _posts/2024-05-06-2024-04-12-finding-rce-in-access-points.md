@@ -1,7 +1,7 @@
 ---
 layout: post
 title: Finding RCE in access points by leveraging MQTT
-date: 2024-05-06 13:39 +0200
+date: 2024-05-20 08:00 +0200
 categories: [vulnerability research, iot, mqtt]
 img_path: /images/ax820
 ---
@@ -11,7 +11,7 @@ img_path: /images/ax820
 I was searching for a product like a home router of an access point (AP) that has not been audited yet.
 My goals were to evaluate and improve my own tooling for vulnerability research on firmware and find and exploit bugs.
 
-My scope was the administration web server and I discarded devices that had not the entire web server coded in C. So no Lua plugins, ASP or PHP servers. I discarded devices that have no firmware provided or had their firmware ciphered. Why ? because it require to perform a memory dump on the device I don't have the tools to dump Nand or read small Nor memory chips.
+My scope was the administration web server and I discarded devices that had not the entire web server coded in C. So no Lua plugins, ASP or PHP servers. I discarded devices that have no firmware provided or had their firmware ciphered.
 
 Finally I found this brand: [Kuwfi](https://kuwfi.com). Their products are available on Amazon and the firmware is available [here](https://kuwfi.com/downloads/firmware-1).
 
@@ -298,11 +298,22 @@ _Useless call to generate_token2save_
 
 I searched for vulnerable calls in the binary but the behaviour I had was not consistent with my expectation. May be due to the difference in the firmware. So I needed an shell on the device.
 
-At this point I decicded to search a way to gain code execution on the AP. I can not use telnet as I don't have the credentials of my AX820. Nonetheless I can get a U-boot shell using Uart and an USB adapter:
+At this point I decicded to search a way to gain code execution on the AP. I can not use telnet as I don't have the credentials of my AX820. So I decided to use my physical access using UART and a USB adapter (ft232):
 
-...
+![Connecting UART to computer](ax820_ft232.jpg)
+_Connecting UART to computer using adapter_
 
-Again I cannot authenticate and AX820 is using mkboot so I can't just change the kernel command line to bypass authentication. I decided to come back here if I don't find anything else.
+I can access logs and even get a prompt to authenticate:
+
+![Boot logs and login](ax820_boot_logs.png)
+_Can see logs but cannot authenticate_
+
+But again I don't have credentials to authenticate. If I press a key quickly during boot (before the kernel image is loaded), I get a _mtkautoboot_ shell but I don't manage to take advantage of it and I did not investigated it further:
+
+![mtkautoboot menu](ax820_mtkautoboot.png)
+_mtkautoboot menu_
+
+So, I cannot authenticate and AX820 is using mtkautoboot so I can't just change the kernel command line to bypass login. I decide to come back here if I don't find anything else.
 
 Finally I notice that I could update the cloud server as I wanted. At first I completely ignored that because I thought it could be complicated to behave as a cloud server. Turns out it was not.
 
@@ -419,7 +430,7 @@ To reach those statements and execute any command, all I need to do is send this
 }
 ```
 
-Note that this ends up in the "if" statement. To inject in do_system in the else statement: change `radioid` from an empty string (null byte) to "\x01\x00".
+Note that this ends up in the "if" statement.
 
 There is a similar vulnerability in the upgrade command:
 
@@ -446,10 +457,21 @@ Here is the payload:
 So the process to obtain code execution on the AP is the following:
 
 0. Start webserver and MQTT broker locally.
-1. Update cloud server using a token obtain through broken authentication.
+1. Update cloud server using a token obtained exploiting the broken authentication.
 2. Provide our MQTT server during the exchange with our fake cloud server.
 3. At this point the access point is authenticated to our MQTT server. Use another MQTT client (or the same account) to publish payloads and execute commands.
 
 ## Demonstration
 
-...
+All the code is on my [Github repository](https://github.com/willboka/AX820-remote-code-execution).
+
+![RCE exploiting set command](ax820_rce_demo.png)
+_Getting a reverse shell using 'set' command_
+
+Here we receive a shell after performing all the steps described in [README.md](https://github.com/willboka/AX820-remote-code-execution). The RCE used here is the command injection in the "set" command.
+
+## Final thoughts
+
+That's interesting to see MQTT used for remote administration in such devices. I thought it would be used to gather statistics but not for sensitive commands such as upgrade.
+The web server was difficult to exploit directly has I had no access to the filesystem of the product but the fact that it allows to update the cloud server URL moves the research on another binary that is less dense and easier to "map" (as we have to look only for MQTT related functions).
+There are certainly many other bugs on the device but I decided to stop there. At the time of writing I reported the vulnerabilities three weeks ago to Kuwfi and Yuncore.
