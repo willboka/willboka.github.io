@@ -8,12 +8,12 @@ img_path: /images/ax820
 
 ## Introduction
 
-I was searching for a product like a home router of an access point (AP) that has not been audited yet.
+I was searching for a product like a home router or an access point (AP) that has not been audited yet.
 My goals were to evaluate and improve my own tooling for vulnerability research on firmware and find and exploit bugs.
 
 My scope was the administration web server and I discarded devices that had not the entire web server coded in C. So no Lua plugins, ASP or PHP servers. I discarded devices that have no firmware provided or had their firmware ciphered.
 
-Finally I found this brand: [Kuwfi](https://kuwfi.com). Their products are available on Amazon and the firmware is available [here](https://kuwfi.com/downloads/firmware-1).
+Finally I found this brand: [Kuwfi](https://kuwfi.com). Their products are availables on Amazon and the firmware is available [here](https://kuwfi.com/downloads/firmware-1).
 
 ![Kuwfi AX820](product_kuwfi_ax820.png){: w="700" h="400" }
 _AX820 from Kuwfi_
@@ -188,7 +188,7 @@ _Parentcgi's main function_
 
 Endpoints' strings and their corresponding handler are in data section. Note that Ghidra did not automatically create function for most of them.
 
-Only the first handler is recongized by Ghidra as a function, others aren't:
+Only the first handler is recognized by Ghidra as a function, others aren't:
 
 ![A handler that is not identified as a function by Ghidra](listing_endpoint_handler.png)
 _A handler that is not identified as a function by Ghidra_
@@ -255,7 +255,7 @@ All inputs comes from functions like `getenv`, `getprop`, `get_token`, `get_cont
 
 - `getenv` is used to retrieve the value of the environnement variables _REMOTE_ADDR_, _HTTP_AUTHORIZATION_ and _REQUEST_METHOD_. It is used to extract the HTTP query parameters from the other functions.
 
-- `getprop` is used to retrieve the request parameters such as _stork_, _opcode_ and _funame_. _stork_ is the authentication token, _opcode_ and _funame_ are unsiged integers that are used by handlers to choose what to do. I show example of request after this paragraph. It hides a call to  `getenv("QUERY_STRING")`.
+- `getprop` is used to retrieve requests parameters such as _stork_, _opcode_ and _funame_. _stork_ is the authentication token, _opcode_ and _funame_ are unsiged integers that are used by handlers to choose what to do. I show example of request after this paragraph. It hides a call to  `getenv("QUERY_STRING")`.
 
 - `get_token` is used to extract the token (_stork_). I suppose the programmers expected to use others tokens but here it is used only with the `stork=` parameter. It extract the token from a call to `getenv("HTTP_COOKIE")` and if it does not work `getenv("QUERY_STRING")`.
 
@@ -373,7 +373,7 @@ User (AX820) authenticate using credentials `yuncorelot:eufhja*@2756_hja`.
 
 Topics and data read from topics is what matters. The AP may be administrated remotely leading to RCE.
 
-Topics names can be extracted from the first function executed in the loop in the main function. In fact this function handles all the HTTP exchanged with the cloud server described above. Topics are defined using prtid and cltid according to this function:
+Topics names can be extracted from the first function executed in the loop in the main function. In fact this function handles all the HTTP exchanged with the cloud server described above. Topics are defined using _prtid_ and _cltid_ according to this function:
 
 ![Building topics strings](cloud_loop_topics.png)
 _Building topics strings_
@@ -470,8 +470,50 @@ _Getting a reverse shell using 'set' command_
 
 Here we receive a shell after performing all the steps described in [README.md](https://github.com/willboka/AX820-remote-code-execution). The RCE used here is the command injection in the "set" command.
 
+By the way, the password is no longer in clear text on AX820 but in a hashed form. I quickly tried to break it using rockyou.txt and _john_ but nothing matched. Anyway I don't need it anymore. Here it is if you want to crack it:
+
+In /etc/:
+
+```bash
+/ # cat etc/passwd
+root:x:0:0:root:/root:/bin/ash
+daemon:*:1:1:daemon:/var:/bin/false
+ftp:*:55:55:ftp:/home/ftp:/bin/false
+network:*:101:101:network:/var:/bin/false
+nobody:*:65534:65534:nobody:/var:/bin/false
+mosquitto:x:200:200:mosquitto:/var/run/mosquitto:/bin/false
+http:x:100:100:http:/var/run/http:/bin/false
+/ # cat etc/shadow
+root:$1$7Kq3p1CM$ZdhylUeqRd1vcvNEQqzpK/:19863:0:99999:7:::
+daemon:*:0:0:99999:7:::
+ftp:*:0:0:99999:7:::
+network:*:0:0:99999:7:::
+nobody:*:0:0:99999:7:::
+mosquitto:x:0:0:99999:7:::
+http:x:0:0:99999:7:::
+```
+
+In /rom/etc/:
+
+```bash
+/ # cat ./rom/etc/passwd
+root:x:0:0:root:/root:/bin/ash
+daemon:*:1:1:daemon:/var:/bin/false
+ftp:*:55:55:ftp:/home/ftp:/bin/false
+network:*:101:101:network:/var:/bin/false
+nobody:*:65534:65534:nobody:/var:/bin/false
+mosquitto:x:200:200:mosquitto:/var/run/mosquitto:/bin/false
+/ # cat ./rom/etc/shadow
+root:$1$oUWwRa3Y$tRlUvBRoRL17Ryhf92emi1:18418:0:99999:7:::
+daemon:*:0:0:99999:7:::
+ftp:*:0:0:99999:7:::
+network:*:0:0:99999:7:::
+nobody:*:0:0:99999:7:::
+mosquitto:x:0:0:99999:7:::
+```
+
 ## Final thoughts
 
-That's interesting to see MQTT used for remote administration in such devices. I thought it would be used to gather statistics but not for sensitive commands such as upgrade.
-The web server was difficult to exploit directly has I had no access to the filesystem of the product but the fact that it allows to update the cloud server URL moves the research on another binary that is less dense and easier to "map" (as we have to look only for MQTT related functions).
-There are certainly many other bugs on the device but I decided to stop there. At the time of writing I reported the vulnerabilities three weeks ago to Kuwfi and Yuncore.
+That's intriguing to see MQTT used for remote administration in such devices. I thought it would be employed to gather statistics but not for sensitive commands like _upgrade_.
+The web server was difficult to exploit directly has I gained no access to the filesystem of the product but the fact that it allows to update the cloud server URL moves the research on another binary that is less dense, easier to "map" (as we have to look exclusively for MQTT related functions) and less secure.
+There are definitely many other bugs on the device, but I decided to stop there. At the time of publishing I reported the vulnerabilities more than three weeks ago to Kuwfi and Yuncore, no response.
