@@ -228,16 +228,20 @@ def rename_vulnerable_sources() -> list[str]:
                 return []
         else:
             fun.setName(endpoint, SourceType.USER_DEFINED)
+
+        # disassemble else you while have to do it manually
+        disassemble(toAddr(func_addr))
     return endpoints
 
 
 def main():
-    sources = rename_vulnerable_sources()  # rename
+    sources = rename_vulnerable_sources()
     print(sources)
 
 
 if __name__ == "__main__":
     main()
+
 ```
 
 Note that i'm using the plugin Ghidrathon to use Python3 for Ghidra.
